@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="mr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Automated Attendance — Demo</title>
+
+  <!-- Chart.js CDN for analytics chart -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    /* Simple modern styling */
+    :root{
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --accent: #2563eb;
+      --muted: #6b7280;
+      --success: #10b981;
+      --danger: #ef4444;
+      --glass: rgba(255,255,255,0.6);
+    }
+    *{box-sizing:border-box;font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+    body{margin:0;background:linear-gradient(180deg,var(--bg),#eef2ff);padding:20px;color:#111;}
+    .container{max-width:1100px;margin:0 auto;}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+    header h1{margin:0;font-size:20px;color:var(--accent);}
+    .card{background:var(--card);border-radius:12px;padding:16px;box-shadow:0 6px 18px rgba(18,38,63,0.07);margin-bottom:16px;}
+    .flex{display:flex;gap:12px;align-items:center;}
+    button{background:var(--accent);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;}
+    button.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent);}
+    table{width:100%;border-collapse:collapse;}
+    th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #eef2ff;font-size:14px;}
+    th{color:var(--muted);font-weight:600;}
+    .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+    input,select{padding:8px;border-radius:8px;border:1px solid #e6e9f2;background:#fff;}
+    .stats{display:flex;gap:12px;flex-wrap:wrap;}
+    .stat{flex:1;min-width:160px;padding:12px;border-radius:10px;background:linear-gradient(180deg,#ffffff,#fbfdff);box-shadow:0 4px 12px rgba(16,24,40,0.04);}
+    .present{color:var(--success);font-weight:700;}
+    .absent{color:var(--danger);font-weight:700;}
+    .small{font-size:12px;color:var(--muted);}
+    .badge{padding:6px 10px;border-radius:999px;background:var(--glass);font-weight:600;color:var(--accent);display:inline-block;}
+    .actions{display:flex;gap:8px;}
+    .center{text-align:center}
+    @media (max-width:700px){
+      .flex{flex-direction:column;align-items:stretch;}
+      header{flex-direction:column;align-items:flex-start;gap:8px;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Attendance System — Demo</h1>
+      <div class="flex">
+        <div class="small">College: <span class="badge">XYZ Engineering</span></div>
+        <div class="small">Semester: <span class="badge">Sem 4</span></div>
+      </div>
+    </header>
+
+    <!-- Controls -->
+    <section class="card">
+      <div class="flex" style="justify-content:space-between;align-items:center;">
+        <div class="controls">
+          <label class="small">Date:
+            <input type="date" id="attDate" />
+          </label>
+
+          <label class="small">Class/Subject:
+            <select id="subjectSelect">
+              <option value="CS101">CS101 - Data Structures</option>
+              <option value="CS102">CS102 - OS</option>
+              <option value="CS103">CS103 - DBMS</option>
+            </select>
+          </label>
+
+          <label class="small">Filter:
+            <select id="filterSelect">
+              <option value="all">All</option>
+              <option value="present">Present</option>
+              <option value="absent">Absent</option>
+            </select>
+          </label>
+
+          <button id="loadSample">Load Sample Students</button>
+        </div>
+
+        <div class="actions">
+          <button id="markAllPresent">Mark All Present</button>
+          <button id="exportCSV" class="ghost">Export CSV</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Attendance table + stats -->
+    <section style="display:grid;grid-template-columns:1fr 360px;gap:12px;">
+      <div class="card" id="attendanceCard">
+        <h3 style="margin:0 0 8px 0">Attendance Register</h3>
+        <table id="studentsTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Student Name</th>
+              <th>Roll No</th>
+              <th>Department</th>
+              <th>Status</th>
+              <th class="center">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- populated by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <aside class="card">
+        <h3 style="margin:0 0 8px 0">Analytics</h3>
+        <div class="stats" style="margin-bottom:10px;">
+          <div class="stat">
+            <div class="small">Total Students</div>
+            <div id="totalStudents" style="font-size:20px;font-weight:700;">0</div>
+          </div>
+          <div class="stat">
+            <div class="small">Present</div>
+            <div id="presentCount" style="font-size:20px;font-weight:700;color:var(--success)">0</div>
+          </div>
+          <div class="stat">
+            <div class="small">Absent</div>
+            <div id="absentCount" style="font-size:20px;font-weight:700;color:var(--danger)">0</div>
+          </div>
+        </div>
+
+        <canvas id="attendanceChart" width="300" height="200"></canvas>
+        <div style="margin-top:8px;">
+          <button id="viewDefaulters" class="ghost">View Defaulters (&lt;75%)</button>
+        </div>
+      </aside>
+    </section>
+
+    <footer style="margin-top:16px;text-align:center;color:var(--muted);font-size:13px;">
+      Demo frontend • Save as <code>attendance_dashboard.html</code> • Replace sample data with backend APIs as needed.
+    </footer>
+  </div>
+
+  <script>
+    /***********************
+     * Demo frontend script
+     ***********************/
+    // Sample student data (will be replaced by backend in real app)
+    let students = [];
+    let attendance = {}; // keyed by date+subject -> {roll: 'present'|'absent'}
+
+    // Utilities
+    function fmtDateInput(d){
+      const dt = new Date(d);
+      const yyyy = dt.getFullYear();
+      const mm = String(dt.getMonth()+1).padStart(2,'0');
+      const dd = String(dt.getDate()).padStart(2,'0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    // Initialize date to today
+    document.getElementById('attDate').value = fmtDateInput(new Date());
+
+    // Load sample students
+    document.getElementById('loadSample').addEventListener('click', ()=>{
+      students = [
+        {name:'Amit Patil', roll:'CE201', dept:'Computer'},
+        {name:'Riya Sharma', roll:'CE202', dept:'Computer'},
+        {name:'Suresh More', roll:'CE203', dept:'Computer'},
+        {name:'Nikhil Deshmukh', roll:'CE204', dept:'Computer'},
+        {name:'Ankita Rane', roll:'CE205', dept:'Computer'},
+        {name:'Rohit Gaikwad', roll:'CE206', dept:'Computer'},
+        {name:'Sneha Kulkarni', roll:'CE207', dept:'Computer'},
+        {name:'Vivek Joshi', roll:'CE208', dept:'Computer'},
+        {name:'Pooja Khatri', roll:'CE209', dept:'Computer'},
+        {name:'Manish Patange', roll:'CE210', dept:'Computer'}
+      ];
+      renderTable();
+      updateStats();
+      alert('Sample students loaded ✅');
+    });
+
+    // Get key for attendance store by date+subject
+    function getKey(){
+      return document.getElementById('attDate').value + '|' + document.getElementById('subjectSelect').value;
+    }
+
+    // Render table
+    function renderTable(){
+      const tbody = document.querySelector('#studentsTable tbody');
+      tbody.innerHTML = '';
+      const key = getKey();
+      const filter = document.getElementById('filterSelect').value;
+
+      students.forEach((s, idx) => {
+        const tr = document.createElement('tr');
+
+        // status
+        const status = (attendance[key] && attendance[key][s.roll]) ? attendance[key][s.roll] : 'absent';
+
+        // Apply filter
+        if(filter === 'present' && status !== 'present') return;
+        if(filter === 'absent' && status !== 'absent') return;
+
+        tr.innerHTML = `
+          <td>${idx+1}</td>
+          <td>${s.name}</td>
+          <td>${s.roll}</td>
+          <td>${s.dept}</td>
+          <td><strong class="${status==='present'?'present':'absent'}">${status.toUpperCase()}</strong></td>
+          <td class="center">
+            <button data-roll="${s.roll}" class="markPresent">Present</button>
+            <button data-roll="${s.roll}" class="markAbsent ghost">Absent</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Attach actions
+      document.querySelectorAll('.markPresent').forEach(btn=>{
+        btn.addEventListener('click', (e)=>{
+          const roll = e.target.dataset.roll;
+          markAttendance(roll, 'present');
+        });
+      });
+      document.querySelectorAll('.markAbsent').forEach(btn=>{
+        btn.addEventListener('click', (e)=>{
+          const roll = e.target.dataset.roll;
+          markAttendance(roll, 'absent');
+        });
+      });
+    }
+
+    // Mark single student
+    function markAttendance(roll, status){
+      const key = getKey();
+      attendance[key] = attendance[key] || {};
+      attendance[key][roll] = status;
+      renderTable();
+      updateStats();
+    }
+
+    // Mark all present
+    document.getElementById('markAllPresent').addEventListener('click', ()=>{
+      const key = getKey();
+      attendance[key] = attendance[key] || {};
+      students.forEach(s => attendance[key][s.roll] = 'present');
+      renderTable();
+      updateStats();
+    });
+
+    // Export CSV of today's attendance
+    document.getElementById('exportCSV').addEventListener('click', ()=>{
+      const key = getKey();
+      const rows = [['Name','Roll','Dept','Status']];
+      students.forEach(s => {
+        const st = (attendance[key] && attendance[key][s.roll]) ? attendance[key][s.roll] : 'absent';
+        rows.push([s.name, s.roll, s.dept, st]);
+      });
+      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `attendance_${key.replace('|','_')}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    // Filter and subject/date change handlers
+    document.getElementById('filterSelect').addEventListener('change', renderTable);
+    document.getElementById('subjectSelect').addEventListener('change', ()=>{ renderTable(); updateStats(); });
+    document.getElementById('attDate').addEventListener('change', ()=>{ renderTable(); updateStats(); });
+
+    // Basic analytics
+    function updateStats(){
+      const key = getKey();
+      const total = students.length;
+      let present = 0;
+      students.forEach(s => {
+        if(attendance[key] && attendance[key][s.roll] === 'present') present++;
+      });
+      const absent = total - present;
+      document.getElementById('totalStudents').innerText = total;
+      document.getElementById('presentCount').innerText = present;
+      document.getElementById('absentCount').innerText = absent;
+
+      // Update chart (present vs absent)
+      drawChart([present, absent]);
+    }
+
+    // Chart.js pie
+    let chartInstance = null;
+    function drawChart(dataArr){
+      const ctx = document.getElementById('attendanceChart').getContext('2d');
+      if(chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: ['Present','Absent'],
+          datasets: [{
+            data: dataArr,
+            backgroundColor: ['rgba(16,185,129,0.9)','rgba(239,68,68,0.9)'],
+          }]
+        },
+        options:{
+          plugins:{legend:{position:'bottom'}},
+          responsive:true,
+          maintainAspectRatio:false
+        }
+      });
+    }
+
+    // View defaulters (students with attendance < 75% across recorded dates)
+    document.getElementById('viewDefaulters').addEventListener('click', ()=>{
+      // Compute attendance percentage across all recorded dates for each student
+      const dates = Object.keys(attendance);
+      if(dates.length === 0){ alert('No attendance recorded yet.'); return; }
+
+      const stats = {};
+      students.forEach(s => stats[s.roll] = {present:0,total:0, name:s.name});
+
+      dates.forEach(k => {
+        students.forEach(s => {
+          const st = attendance[k][s.roll] || 'absent';
+          stats[s.roll].total += 1;
+          if(st === 'present') stats[s.roll].present += 1;
+        });
+      });
+
+      // build list of defaulters (<75%)
+      const defaulters = [];
+      for(const r in stats){
+        const obj = stats[r];
+        const pct = (obj.present / obj.total) * 100;
+        if(pct < 75) defaulters.push({roll:r,name:obj.name,pct:Math.round(pct)});
+      }
+
+      if(defaulters.length === 0) {
+        alert('No defaulters. All students >= 75% across recorded dates.');
+      } else {
+        const lines = defaulters.map(d => `${d.name} (${d.roll}) — ${d.pct}%`);
+        alert('Defaulters (<75%):\n\n' + lines.join('\n'));
+      }
+    });
+
+    // On load, initialize empty chart and empty table
+    window.addEventListener('load', ()=>{
+      renderTable();
+      updateStats();
+    });
+
+    // For demo: mark first two students present automatically (optional)
+    // setTimeout(()=> { if(students.length) { markAttendance(students[0].roll,'present'); markAttendance(students[1].roll,'present'); } }, 1200);
+  </script>
+</body>
+</html>

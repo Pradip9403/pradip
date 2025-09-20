@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+SQLAlchemy
+alembic==1.11.1
+pydantic
+python-multipart
+databases
